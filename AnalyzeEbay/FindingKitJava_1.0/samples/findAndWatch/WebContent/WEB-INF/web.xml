@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app id="WebApp_ID" version="2.4" xmlns="http://java.sun.com/xml/ns/j2ee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd">
+	<display-name>findAddWatch</display-name>
+	<context-param>
+	    <param-name>AppID</param-name>
+	    <param-value>YOUR APPID HERE</param-value>
+	</context-param>
+	<context-param>
+	    <param-name>FindingServerAddress</param-name>
+	    <!-- for sandbox -->
+	    <param-value>http://svcs.sandbox.ebay.com/services/search/FindingService/v1</param-value>
+	    <!-- for production -->
+	    <!-- param-value>http://svcs.ebay.com/services/search/FindingService/v1</param-value-->
+	</context-param>
+	<context-param>
+	    <param-name>EBayToken</param-name>
+	    <param-value>YOUR TOKEN HERE</param-value>
+	</context-param>
+	<context-param>
+	    <param-name>TradingServerAddress</param-name>
+	    <!-- for sandbox -->
+	    <param-value>https://api.sandbox.ebay.com/wsapi</param-value>
+	    <!-- for production -->
+	    <!-- param-value>https://api.ebay.com/wsapi</param-value-->
+	</context-param>
+	<servlet>
+		<description>Find items by keywords</description>
+		<display-name>FindingController</display-name>
+		<servlet-name>FindingController</servlet-name>
+		<servlet-class>com.ebay.sample.FindingController</servlet-class>
+	</servlet>
+	<servlet>
+		<description>
+		Add item to watch list and show watching items</description>
+		<display-name>WatchingController</display-name>
+		<servlet-name>WatchingController</servlet-name>
+		<servlet-class>
+		com.ebay.sample.WatchingController</servlet-class>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>FindingController</servlet-name>
+		<url-pattern>/finding.do</url-pattern>
+	</servlet-mapping>
+	<servlet-mapping>
+		<servlet-name>WatchingController</servlet-name>
+		<url-pattern>/watching.do</url-pattern>
+	</servlet-mapping>
+	<welcome-file-list>
+		<welcome-file>finding.do</welcome-file>
+	</welcome-file-list>
+	<error-page>
+	  <exception-type>java.lang.Exception</exception-type>
+	  <location>/error.jsp</location>
+	</error-page>
+</web-app>
