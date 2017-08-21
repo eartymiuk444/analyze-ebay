@@ -60,13 +60,43 @@ public class AnalyzeEbay
 	private static final String MIN_COMMAND_OPTION = "--min";
 	private static final String MAX_COMMAND_OPTION = "--max";
 	
+	private static final String USED_OPTION = "--u";
+	private static final String NEW_OPTION = "--n";
+	private static final String BROKEN_OPTION = "--b";
+	
 	private static final String TXT_EXT = ".txt";
 	
 	private static final String ITEMS_ALREADY_IN_FILE = "Items already in file: ";
 	private static final String REACHED_EOF = "Reached end of file";
 	private static final String EXISTING_FILE_NOT_FOUND = "Existing file not found";
 	
-	private static final String USED_CONDITION = "Used";
+	private static final String USED_CONDITION = "Used";	//includes used, refurbished, or for parts. Excludes items with new or unspecified conditions
+	private static final String NEW_CONDITION = "New";		//excludes used, refurbished, for parts, or unspecified conditions
+	private static final String BROKEN_CONDITION = "7000";
+	
+	/**
+		1000
+		    New 
+		1500
+		    New other (see details) 
+		1750
+		    New with defects 
+		2000
+		    Manufacturer refurbished 
+		2500
+		    Seller refurbished 
+		3000
+		    Used 
+		4000
+		    Very Good 
+		5000
+		    Good 
+		6000
+		    Acceptable 
+		7000
+		    For parts or not working 
+	 */
+	
 	private static final String PAGE = "Page";
 	
 	private static final String NUM_DUP = "Number of Duplicates: ";
@@ -97,7 +127,7 @@ public class AnalyzeEbay
 	
 	/**
 	 * Entry point for the analyze ebay command line program
-	 * @param args - keywords and min and max should be specified on the command line as keyword1 keyword2 ... --min min --max max
+	 * @param args - keywords and min and max should be specified on the command line as keyword1 keyword2 ... --ubn --min min --max max
 	 * @throws IOException
 	 * @throws ClassNotFoundException
 	 */
@@ -117,6 +147,7 @@ public class AnalyzeEbay
         boolean maxSet = false;
         double min = -1;
         double max = -1;
+        String condition = USED_CONDITION;
         
         if (commandLineResult[2] != null)
         {
@@ -128,16 +159,33 @@ public class AnalyzeEbay
         	maxSet = true;
             max = (Double)commandLineResult[3];
         }
+        
+        int conditionInt = (Integer)commandLineResult[4];
+        if (conditionInt == 0)
+        {
+        	condition = USED_CONDITION;
+        }
+        else if (conditionInt == 1)
+        {
+        	condition = NEW_CONDITION;
+        }
+        else if (conditionInt == 2)
+        {
+        	condition = BROKEN_CONDITION;
+        }
+        System.out.println(condition);
+        
         /** End process command line arguments **/
         
         /** Read in any existing items **/
         HashMap<String, SearchItem> allItemsMap = new HashMap<String, SearchItem>();
 
-        String fileName = keywords + " " + MIN_COMMAND_OPTION + Double.toString(min) + " " + MAX_COMMAND_OPTION + Double.toString(max);
+        String fileName = keywords + " " + condition + " " + MIN_COMMAND_OPTION + Double.toString(min) + " " + MAX_COMMAND_OPTION + Double.toString(max);
         fileName = fileName.replace("/", "");
         
         File file = new File(fileName);
         PrintWriter output = new PrintWriter(fileName + TXT_EXT);
+        PrintWriter itemOutput = new PrintWriter(fileName + "_items" + TXT_EXT);
         
     	//Read in all existing items from the file (if any)
         if (file.exists())
@@ -180,6 +228,7 @@ public class AnalyzeEbay
             FindCompletedItemsRequest request = new FindCompletedItemsRequest();
             
             //set request parameters
+            System.out.println(keywords);
             request.setKeywords(keywords);
 
             ItemFilter soldItemFilter = new ItemFilter();
@@ -187,10 +236,10 @@ public class AnalyzeEbay
             soldItemFilter.getValue().add(Boolean.toString(true));
             request.getItemFilter().add(soldItemFilter);
             
-            ItemFilter usedItemFilter = new ItemFilter();
-            usedItemFilter.setName(ItemFilterType.CONDITION);
-            usedItemFilter.getValue().add(USED_CONDITION);
-            request.getItemFilter().add(usedItemFilter);
+            ItemFilter conditionItemFilter = new ItemFilter();
+            conditionItemFilter.setName(ItemFilterType.CONDITION);
+            conditionItemFilter.getValue().add(condition);
+            request.getItemFilter().add(conditionItemFilter);
                         
             if (minSet)
             {
@@ -239,7 +288,6 @@ public class AnalyzeEbay
 	        			numNewItems++;
 	        			allItemsMap.put(item.getItemId(), item);	        			
 	        		}
-        			printItemDetails(System.out, item);
 	        	}
 	        	
 	        	currPageNum++;
@@ -270,19 +318,21 @@ public class AnalyzeEbay
         
         for (SearchItem item : allItemsMap.values())
         {        	
+			printItemDetails(itemOutput, item);
         	objOutputStream.writeObject(item);
         }
         fileOutputStream.close();
         objOutputStream.close();
+        itemOutput.close();
         output.close();
     }
     
     /**
      * Private helper method that prints out details of a SearchItem to the passed print stream.
-     * @param out - the print stream to print to
+     * @param out - the print writer to print to
      * @param item - the item to print the details of
      */
-    private static void printItemDetails(PrintStream out, SearchItem item)
+    private static void printItemDetails(PrintWriter out, SearchItem item)
     {
     	out.println(item.getTitle());
         out.println(item.getSellingStatus().getConvertedCurrentPrice().getValue());
@@ -506,16 +556,19 @@ public class AnalyzeEbay
      * 			arr[1]: String - concatenated keywords
      * 			arr[2]: Double- min value if set null otherwise
      * 			arr[3]: Double - max value if set null otherwise
+     * 			arr[4]: Integer - 0 if used condition (default), 1 if new condition, 2 if broken
      */
     private static Object[] processCommandLineArgs(String[] args)
     {
-    	Object[] objArr = new Object[4];
+    	Object[] objArr = new Object[5];
     	objArr[0] = null;
     	objArr[1] = null;
     	objArr[2] = null;
     	objArr[3] = null;
+    	objArr[4] = 0;
     	
-    	if (args.length < 1 || args[0].equals(MIN_COMMAND_OPTION) || args[0].equals(MAX_COMMAND_OPTION))
+    	if (args.length < 1 || args[0].equals(MIN_COMMAND_OPTION) || args[0].equals(MAX_COMMAND_OPTION)
+    			|| args[0].equals(USED_OPTION) || args[0].equals(NEW_OPTION) || args[0].equals(BROKEN_OPTION))
     	{
     		objArr[0] = NO_KEYWORDS_ERROR;
     		return objArr;
@@ -523,10 +576,33 @@ public class AnalyzeEbay
     	
     	String keywords = args[0];
 
-    	//Concatenate the keywords and check for the --min option
+    	//Concatenate the keywords and check for condition option and the --min option
         for (int i = 1; i < args.length; i++)
         {
         	objArr[1] = keywords;
+        	
+        	//Check for the condition option (the last one specified is the one we use)
+        	if (args[i].equals(USED_OPTION) || 
+        			args[i].equals(NEW_OPTION) || 
+        			args[i].equals(BROKEN_OPTION))
+        	{
+        		if (args[i].equals(USED_OPTION))
+        		{
+        			objArr[4] = 0;
+        		}
+        		else if (args[i].equals(NEW_OPTION))
+        		{
+        			objArr[4] = 1;
+        		}
+        		else if (args[i].equals(BROKEN_OPTION))
+        		{
+        			objArr[4] = 2;
+        		}
+        		
+        		break;
+        	}
+        	
+        	
         	//Check for the --min option
         	
         	// If --min specified at i than
@@ -588,6 +664,7 @@ public class AnalyzeEbay
         		
         		//return as there should not be any more keywords after --min is specified
         		return objArr;
+        		
         	}
         	
         	//Check for the --max option before the --min option, which is an error
