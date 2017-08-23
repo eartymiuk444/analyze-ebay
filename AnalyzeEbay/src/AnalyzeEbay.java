@@ -35,15 +35,16 @@ import com.ebay.services.finding.SearchItem;
  * AnalyzeEbay command line program main class.
  * 
  * Program to be run as jar as: 
- * "analyzeEbay keyword1 keyword2 keyword3 ... --min(optional) min --max(optional) max"
+ * "analyzeEbay keyword1 keyword2 keyword3 ... --unb --min(optional) min --max(optional) max"
  * 
- * Finds used items that sold on ebay between the min and max price specified. 
+ * Finds items that sold on ebay between the min and max price specified with the condition specified.
  * 
  * Stores results in a file unique to the search query. First searches for existence of this file and
- * will read from and add to it. (keyword1 keyword2 ...--min(min)--max(max))
+ * will read from and add to it. (keyword1 keyword2 ... <Condition> --min(min)--max(max))
  * 
  * Constructs report of summary stats of the items that were found in the search in a text file of the 
- * same name. (keyword1 keyword2 ...--min(min)--max(max).txt)
+ * same name. (keyword1 keyword2 ... <Condition> --min(min)--max(max).txt) Also prints out a readable item
+ * text file.
  */
 public class AnalyzeEbay 
 {
@@ -125,6 +126,10 @@ public class AnalyzeEbay
 	
 	private static final String WEEKLY_AVERAGE = "Weekly Average Over Time";
 	
+	private static final String BLOB_DIR = "BlobObjectes/";
+	private static final String ITEM_DIR = "ItemLists/";
+	private static final String SUMMARY_DIR = "SummaryReports/";
+	
 	/**
 	 * Entry point for the analyze ebay command line program
 	 * @param args - keywords and min and max should be specified on the command line as keyword1 keyword2 ... --ubn --min min --max max
@@ -177,15 +182,39 @@ public class AnalyzeEbay
         
         /** End process command line arguments **/
         
+        /** Check for the necessary directories where the output files will be located and create if necessary **/
+        File blobDir = new File(BLOB_DIR);
+        File itemDir = new File(ITEM_DIR);
+        File summaryDir = new File(SUMMARY_DIR);
+        
+        if (!blobDir.exists())
+        {
+            blobDir.mkdir();
+        }
+        if (!itemDir.exists())
+        {
+        	itemDir.mkdir();
+        }
+        if (!summaryDir.exists())
+        {
+            summaryDir.mkdir();
+        }
+        
+        /** End create directories **/
+        
         /** Read in any existing items **/
         HashMap<String, SearchItem> allItemsMap = new HashMap<String, SearchItem>();
 
         String fileName = keywords + " " + condition + " " + MIN_COMMAND_OPTION + Double.toString(min) + " " + MAX_COMMAND_OPTION + Double.toString(max);
         fileName = fileName.replace("/", "");
         
-        File file = new File(fileName);
-        PrintWriter output = new PrintWriter(fileName + TXT_EXT);
-        PrintWriter itemOutput = new PrintWriter(fileName + "_items" + TXT_EXT);
+        File file = new File(BLOB_DIR + fileName);
+
+        System.out.println(file.getAbsolutePath());
+        System.out.println(file.exists());
+        
+        PrintWriter summaryReportOutput = new PrintWriter(SUMMARY_DIR + fileName + TXT_EXT);
+        PrintWriter itemOutput = new PrintWriter(ITEM_DIR + fileName + "_items" + TXT_EXT);
         
     	//Read in all existing items from the file (if any)
         if (file.exists())
@@ -204,17 +233,16 @@ public class AnalyzeEbay
         	catch (EOFException e)
         	{
         		System.out.println(ITEMS_ALREADY_IN_FILE + allItemsMap.size());
-        		output.println(ITEMS_ALREADY_IN_FILE + allItemsMap.size());
-        		output.println(REACHED_EOF);
+        		summaryReportOutput.println(ITEMS_ALREADY_IN_FILE + allItemsMap.size());
+        		summaryReportOutput.println(REACHED_EOF);
         		fileInputStream.close();
         		objInputStream.close();
-        		
         	}
         }
         else
         {
         	System.out.println(EXISTING_FILE_NOT_FOUND);
-        	output.println(EXISTING_FILE_NOT_FOUND);
+        	summaryReportOutput.println(EXISTING_FILE_NOT_FOUND);
         }
         /** End read in any existing items **/
         
@@ -298,8 +326,8 @@ public class AnalyzeEbay
 	            
 	        	result = serviceClient.findCompletedItems(request);
             }
-            output.println(NUM_DUP + numDup);
-            output.println(NUM_NEW + numNewItems);
+            summaryReportOutput.println(NUM_DUP + numDup);
+            summaryReportOutput.println(NUM_NEW + numNewItems);
             System.out.println(NUM_DUP + numDup);
             System.out.println(NUM_NEW + numNewItems);
         } 
@@ -310,21 +338,19 @@ public class AnalyzeEbay
         /** End make an API call **/
         
         /** Print reports **/
-        printFullReport(allItemsMap, output);
+        printFullReport(allItemsMap, summaryReportOutput);
         
         /** Save back to our file **/
-        FileOutputStream fileOutputStream = new FileOutputStream(file);
-    	ObjectOutputStream objOutputStream = new ObjectOutputStream(fileOutputStream);
-        
+    	ObjectOutputStream objOutputStream = new ObjectOutputStream(new FileOutputStream(file));
+
         for (SearchItem item : allItemsMap.values())
         {        	
 			printItemDetails(itemOutput, item);
         	objOutputStream.writeObject(item);
         }
-        fileOutputStream.close();
-        objOutputStream.close();
-        itemOutput.close();
-        output.close();
+        objOutputStream.close();	//object file
+        itemOutput.close();			//readable item file
+        summaryReportOutput.close();				//report summary file
     }
     
     /**
@@ -598,83 +624,83 @@ public class AnalyzeEbay
         		{
         			objArr[4] = 2;
         		}
-        		
-        		break;
         	}
         	
-        	
-        	//Check for the --min option
-        	
-        	// If --min specified at i than
-        	// should have:
-        	// i (i+1 length): --min
-        	// i+1 (i+2 length): <min_value>
-        	// i+2 (i+3 length): --max (optional)
-        	// i+3 (i+4 length): <max_value>
-        	if (args[i].equals(MIN_COMMAND_OPTION))
+        	else
         	{
-        		int minOptionIndex = i;
-        		int minValueIndex = i+1;
-        		int maxOptionIndex = i+2;
-        		int maxValueIndex = i+3;
-        		
-        		int lastValidIndex = args.length-1;
-        		
-        		if (lastValidIndex < minValueIndex)
-        		{
-        			objArr[0] = MIN_VALUE_NOT_SPECIFIED;
-            		return objArr;
-        		}
-        		
-        		try
-    			{
-    				objArr[2] = Double.parseDouble(args[minValueIndex]);
-    			}
-    			catch (NumberFormatException e)
-    			{
-    				objArr[0] = MIN_VALUE_INVALID;
-    	    		return objArr;
-    			}
-        		
-        		//Check for the --max option
-        		if (lastValidIndex >= maxOptionIndex)
-        		{
-        			if (!args[maxOptionIndex].equals(MAX_COMMAND_OPTION) || lastValidIndex > maxValueIndex)
-        			{
-        				objArr[0] = ONLY_MAX_AFTER_MIN;
-        	    		return objArr;
-        			}
-        			
-        			if (lastValidIndex < maxValueIndex)
-        			{
-        				objArr[0] = MAX_VALUE_NOT_SPECIFIED;
-        	    		return objArr;
-        			}
-        			
-    				try
-    				{
-    					objArr[3] = Double.parseDouble(args[maxValueIndex]);
-    				}
-    				catch (NumberFormatException e)
-    				{
-    					objArr[0] = MAX_VALUE_INVALID;
-        	    		return objArr;
-    				}
-        		}
-        		
-        		//return as there should not be any more keywords after --min is specified
-        		return objArr;
-        		
+	        	//Check for the --min option
+	        	
+	        	// If --min specified at i than
+	        	// should have:
+	        	// i (i+1 length): --min
+	        	// i+1 (i+2 length): <min_value>
+	        	// i+2 (i+3 length): --max (optional)
+	        	// i+3 (i+4 length): <max_value>
+	        	if (args[i].equals(MIN_COMMAND_OPTION))
+	        	{
+	        		int minOptionIndex = i;
+	        		int minValueIndex = i+1;
+	        		int maxOptionIndex = i+2;
+	        		int maxValueIndex = i+3;
+	        		
+	        		int lastValidIndex = args.length-1;
+	        		
+	        		if (lastValidIndex < minValueIndex)
+	        		{
+	        			objArr[0] = MIN_VALUE_NOT_SPECIFIED;
+	            		return objArr;
+	        		}
+	        		
+	        		try
+	    			{
+	    				objArr[2] = Double.parseDouble(args[minValueIndex]);
+	    			}
+	    			catch (NumberFormatException e)
+	    			{
+	    				objArr[0] = MIN_VALUE_INVALID;
+	    	    		return objArr;
+	    			}
+	        		
+	        		//Check for the --max option
+	        		if (lastValidIndex >= maxOptionIndex)
+	        		{
+	        			if (!args[maxOptionIndex].equals(MAX_COMMAND_OPTION) || lastValidIndex > maxValueIndex)
+	        			{
+	        				objArr[0] = ONLY_MAX_AFTER_MIN;
+	        	    		return objArr;
+	        			}
+	        			
+	        			if (lastValidIndex < maxValueIndex)
+	        			{
+	        				objArr[0] = MAX_VALUE_NOT_SPECIFIED;
+	        	    		return objArr;
+	        			}
+	        			
+	    				try
+	    				{
+	    					objArr[3] = Double.parseDouble(args[maxValueIndex]);
+	    				}
+	    				catch (NumberFormatException e)
+	    				{
+	    					objArr[0] = MAX_VALUE_INVALID;
+	        	    		return objArr;
+	    				}
+	        		}
+	        		
+	        		//return as there should not be any more keywords after --min is specified
+	        		return objArr;
+	        		
+	        	}
+	        	
+	        	//Check for the --max option before the --min option, which is an error
+	        	else if (args[i].equals(MAX_COMMAND_OPTION))
+	        	{
+					objArr[0] = MAX_BEFORE_MIN_ERROR;
+		    		return objArr;
+	        	}
+	        	
+	            keywords = keywords + " " + args[i];
         	}
-        	
-        	//Check for the --max option before the --min option, which is an error
-        	else if (args[i].equals(MAX_COMMAND_OPTION))
-        	{
-				objArr[0] = MAX_BEFORE_MIN_ERROR;
-	    		return objArr;
-        	}
-        	
-            keywords = keywords + " " + args[i];
         }
         
         objArr[1] = keywords;
