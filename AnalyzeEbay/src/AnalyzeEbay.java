@@ -337,13 +337,24 @@ public class AnalyzeEbay
         }
         /** End make an API call **/
         
+        /** Sort the items into a list by date **/
+        List<SearchItem> allItemsList = new ArrayList<SearchItem>();
+		allItemsList.addAll(allItemsMap.values());
+		allItemsList.sort(new Comparator<SearchItem>() {
+			@Override
+			public int compare(SearchItem o1, SearchItem o2) 
+			{
+				return o2.getListingInfo().getEndTime().getTime().compareTo(o1.getListingInfo().getEndTime().getTime());
+			}
+		});
+		
         /** Print reports **/
-        printFullReport(allItemsMap, summaryReportOutput);
+        printFullReport(allItemsList, summaryReportOutput);
         
         /** Save back to our file **/
     	ObjectOutputStream objOutputStream = new ObjectOutputStream(new FileOutputStream(file));
 
-        for (SearchItem item : allItemsMap.values())
+        for (SearchItem item : allItemsList)
         {        	
 			printItemDetails(itemOutput, item);
         	objOutputStream.writeObject(item);
@@ -372,11 +383,11 @@ public class AnalyzeEbay
     /**
      * Private helper that prints a report (summary stats) of all the SearchItems in the passed allItemMap to the
      * given PrintWriter.
-     * @param allItemsMap - a mapping of itemId to SearchItem to print the some details on
+     * @param allItemsList - sorted list of all the search items
      * @param output - the printwriter to print the details of the SearchItems to
      * @throws FileNotFoundException
      */
-    private static void printFullReport(HashMap<String, SearchItem> allItemsMap, PrintWriter output) throws FileNotFoundException
+    private static void printFullReport(List<SearchItem> allItemsList, PrintWriter output) throws FileNotFoundException
     {
     	/** Put together summary stats **/
         DescriptiveStatistics stat = new DescriptiveStatistics();
@@ -404,16 +415,6 @@ public class AnalyzeEbay
 		weekCal.add(Calendar.WEEK_OF_YEAR, -1);
 		weeklyStats.put(weekCal.getTime(), new DescriptiveStatistics());
 		
-		
-		List<SearchItem> allItemsList = new ArrayList<SearchItem>();
-		allItemsList.addAll(allItemsMap.values());
-		allItemsList.sort(new Comparator<SearchItem>() {
-			@Override
-			public int compare(SearchItem o1, SearchItem o2) 
-			{
-				return o2.getListingInfo().getEndTime().getTime().compareTo(o1.getListingInfo().getEndTime().getTime());
-			}
-		});
 
         for (SearchItem item : allItemsList)
         {        	
